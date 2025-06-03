@@ -1,0 +1,111 @@
+trasnmitter side 1:
+import time
+import RPi.GPIO as GPIO
+import Adafruit_DHT
+from RF24 import RF24, rf24_datarate_e, rf24_pa_dbm_e
+DHT_SENSOR = Adafruit_DHT.DHT22
+DHT_PIN = 4
+
+GPIO.setmode(GPIO.BCM)
+
+pipes = [[0xE8, 0xE8, 0xF0, 0xF0, 0xE1], [0xF0, 0xF0, 0xF0, 0xF0, 0xE1]]
+
+radio = RF24(22,0)
+
+radio.begin()
+radio.setPayloadSize(32)
+radio.setChannel(80)
+radio.setDataRate(rf24_datarate_e.RF24_1MBPS)
+radio.setPALevel(rf24_pa_dbm_e.RF24_PA_MIN)
+radio.setAutoAck(True, 1)
+radio.enableDynamicPayloads()
+radio.enableAckPayload()
+radio.openWritingPipe(bytes(pipes[0]))
+radio.printDetails()
+while True:
+    humidity, temperature = Adafruit_DHT.read_retry(DHT_SENSOR, DHT_PIN)
+    if humidity is not None and temperature is not None:
+        message = f"{temperature:.2f},{humidity:.2f}"
+        radio.write(message.encode())  # Convert the message string to bytes
+        print(f"Sent: {message}")
+    else:
+        print("Failed to retrieve data from DHT22 sensor")
+    time.sleep(2)
+
+
+trasnmitter side 2:
+import time
+import RPi.GPIO as GPIO
+import Adafruit_DHT
+from RF24 import RF24, rf24_datarate_e, rf24_pa_dbm_e
+DHT_SENSOR = Adafruit_DHT.DHT22
+DHT_PIN = 4
+
+GPIO.setmode(GPIO.BCM)
+
+pipes = [[0xE8, 0xE8, 0xF0, 0xF0, 0xE1], [0xF0, 0xF0, 0xF0, 0xF0, 0xE1]]
+
+radio = RF24(22,0)
+
+radio.begin()
+radio.setPayloadSize(32)
+radio.setChannel(80)
+radio.setDataRate(rf24_datarate_e.RF24_1MBPS)
+radio.setPALevel(rf24_pa_dbm_e.RF24_PA_MIN)
+radio.setAutoAck(True, 1)
+radio.enableDynamicPayloads()
+radio.enableAckPayload()
+radio.openWritingPipe(bytes(pipes[0]))
+radio.printDetails()
+while True:
+    humidity, temperature = Adafruit_DHT.read_retry(DHT_SENSOR, DHT_PIN)
+    if humidity is not None and temperature is not None:
+        message = f"{temperature:.2f},{humidity:.2f}"
+        radio.write(message.encode())  # Convert the message string to bytes
+        print(f"Sent: {message}")
+    else:
+        print("Failed to retrieve data from DHT22 sensor")
+    time.sleep(2)
+
+
+
+reciver side:
+import time
+import RPi.GPIO as GPIO
+from RF24 import RF24, rf24_datarate_e, rf24_pa_dbm_e
+from RPLCD.i2c import CharLCD
+
+GPIO.setmode(GPIO.BCM)
+
+pipes = [[0xE8, 0xE8, 0xF0, 0xF0, 0xE1], [0xF0, 0xF0, 0xF0, 0xF0, 0xE1]]
+
+radio = RF24(22,0)
+radio.begin()
+radio.setPayloadSize(32)
+radio.setChannel(0x50)
+radio.setDataRate(rf24_datarate_e.RF24_1MBPS)
+radio.setPALevel(rf24_pa_dbm_e.RF24_PA_MIN)
+radio.setAutoAck(True, 1)
+radio.enableDynamicPayloads()
+radio.enableAckPayload()
+radio.openReadingPipe(1, bytes(pipes[0]))
+radio.startListening()
+radio.printDetails()
+
+# Initialize the LCD (assuming it's on I2C address 0x27)
+lcd = CharLCD(i2c_expander='PCF8574', address=0x27, port=1,
+              cols=16, rows=2, dotsize=8,
+              charmap='A02',
+              auto_linebreaks=True,
+              backlight_enabled=True)
+
+while True:
+    while not radio.available():
+        time.sleep(1/100)
+    receivedMessage = radio.read(11)  # Read the received data
+    message = ''.join(chr(x) for x in receivedMessage)
+    print(f"Received: {message}")
+    
+    # Clear the LCD and write the received message
+    lcd.clear()
+    lcd.write_string(message)
